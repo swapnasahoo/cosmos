@@ -46,13 +46,10 @@ interface Firefly {
 export default function Simulator() {
   // Simulator State
   const [isRunning, setIsRunning] = useState(false);
-  const [cosmicTime, setCosmicTime] = useState(0);
   const [darkEnergy, setDarkEnergy] = useState(1.1);
   const [gravity, setGravity] = useState(1.2);
   const [maxParticles, setMaxParticles] = useState(150);
   const [simSpeed, setSimSpeed] = useState(1.0);
-  const [hudState, setHudState] = useState("Idle");
-  const [hudDensity, setHudDensity] = useState("0%");
   
   // Audio state hooks
   const [isSoundEnabled, setIsSoundEnabled] = useState(false);
@@ -66,6 +63,24 @@ export default function Simulator() {
   const worldMapImgRef = useRef<HTMLImageElement | null>(null);
   const animationFrameIdRef = useRef<number | null>(null);
   const spokenPhasesRef = useRef({ phase1: false, phase2: false, phase3: false, phase4: false });
+
+  // HUD Text Refs to bypass state re-renders during active frame loop
+  const hudStateRef = useRef<HTMLSpanElement | null>(null);
+  const hudTimeRef = useRef<HTMLSpanElement | null>(null);
+  const hudDensityRef = useRef<HTMLSpanElement | null>(null);
+  const clumpingTickRef = useRef(0);
+  const lastPingTimeRef = useRef(0);
+
+  // Tuning parameter refs for real-time slider reactions without closures lag
+  const darkEnergyRef = useRef(darkEnergy);
+  const gravityRef = useRef(gravity);
+  const maxParticlesRef = useRef(maxParticles);
+  const simSpeedRef = useRef(simSpeed);
+
+  useEffect(() => { darkEnergyRef.current = darkEnergy; }, [darkEnergy]);
+  useEffect(() => { gravityRef.current = gravity; }, [gravity]);
+  useEffect(() => { maxParticlesRef.current = maxParticles; }, [maxParticles]);
+  useEffect(() => { simSpeedRef.current = simSpeed; }, [simSpeed]);
 
   // Physics Data Refs
   const cosmicWebParticlesRef = useRef<CosmicParticleType[]>([]);
@@ -174,6 +189,11 @@ export default function Simulator() {
   const playPing = () => {
     const ctx = audioCtxRef.current;
     if (!ctx || !isSoundEnabled) return;
+    const now = ctx.currentTime;
+    // Throttle to at most one ping every 80ms to avoid audio overload/stutter
+    if (now - lastPingTimeRef.current < 0.08) return;
+    lastPingTimeRef.current = now;
+
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
@@ -397,9 +417,11 @@ export default function Simulator() {
   // --- DRAW LOOPS ---
   const drawCosmicWeb = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const particles = cosmicWebParticlesRef.current;
+    const gravityVal = gravityRef.current;
+    const darkEnergyVal = darkEnergyRef.current;
 
     // N-body gravity attraction
-    if (gravity > 0.05) {
+    if (gravityVal > 0.05) {
       for (let i = 0; i < particles.length; i++) {
         const p1 = particles[i];
         for (let j = i + 1; j < particles.length; j++) {
@@ -407,13 +429,14 @@ export default function Simulator() {
           const dx = p2.x - p1.x;
           const dy = p2.y - p1.y;
           const distanceSq = dx * dx + dy * dy;
-          const dist = Math.sqrt(distanceSq);
-          if (dist < 100 && dist > 4) {
-            const force = (gravity * 0.03 * p1.mass * p2.mass) / (distanceSq + 20);
-            p1.vx += (dx / dist) * force;
-            p1.vy += (dy / dist) * force;
-            p2.vx -= (dx / dist) * force;
-            p2.vy -= (dy / dist) * force;
+          if (distanceSq < 10000 && distanceSq > 16) {
+            const dist = Math.sqrt(distanceSq);
+            const force = (gravityVal * 0.03 * p1.mass * p2.mass) / (distanceSq + 20);
+            const fOverDist = force / dist;
+            p1.vx += dx * fOverDist;
+            p1.vy += dy * fOverDist;
+            p2.vx -= dx * fOverDist;
+            p2.vy -= dy * fOverDist;
           }
         }
       }
@@ -425,8 +448,9 @@ export default function Simulator() {
       const p1 = particles[i];
       for (let j = i + 1; j < particles.length; j++) {
         const p2 = particles[j];
-        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-        if (dist < 40) {
+        const distSq = (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y);
+        if (distSq < 1600) {
+          const dist = Math.sqrt(distSq);
           ctx.strokeStyle = `rgba(0, 242, 254, ${0.04 * (1 - dist / 40)})`;
           ctx.beginPath();
           ctx.moveTo(p1.x, p1.y);
@@ -440,8 +464,8 @@ export default function Simulator() {
       p1.y += p1.vy;
       const dx = p1.x - width / 2;
       const dy = p1.y - height / 2;
-      p1.x += dx * (darkEnergy * 0.0035);
-      p1.y += dy * (darkEnergy * 0.0035);
+      p1.x += dx * (darkEnergyVal * 0.0035);
+      p1.y += dy * (darkEnergyVal * 0.0035);
       p1.vx *= 0.985;
       p1.vy *= 0.985;
 
@@ -452,25 +476,41 @@ export default function Simulator() {
       ctx.fill();
     }
 
-    // Calculate clumping
-    let clustered = 0;
-    particles.forEach((p) => {
-      let neighborCount = 0;
-      particles.forEach((other) => {
-        if (p === other) return;
-        if (Math.hypot(p.x - other.x, p.y - other.y) < 25) neighborCount++;
-      });
-      if (neighborCount >= 3) clustered++;
-    });
+    // Calculate clumping - throttled to every 5 frames for performance
+    clumpingTickRef.current++;
+    if (clumpingTickRef.current % 5 === 0 || !hudDensityRef.current?.textContent) {
+      let clustered = 0;
+      const rangeSq = 25 * 25;
+      for (let i = 0; i < particles.length; i++) {
+        const p1 = particles[i];
+        let neighborCount = 0;
+        for (let j = 0; j < particles.length; j++) {
+          if (i === j) continue;
+          const p2 = particles[j];
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          if (dx * dx + dy * dy < rangeSq) neighborCount++;
+        }
+        if (neighborCount >= 3) clustered++;
+      }
 
-    const pct = (clustered / particles.length) * 100;
-    setHudDensity(`Cluster Formation: ${pct.toFixed(0)}%`);
-    setHudState("Cosmic Filament Expansion");
+      const pct = (clustered / (particles.length || 1)) * 100;
+      if (hudDensityRef.current) {
+        hudDensityRef.current.textContent = `Cluster Formation: ${pct.toFixed(0)}%`;
+      }
+    }
+    
+    if (hudStateRef.current && hudStateRef.current.textContent !== "Cosmic Filament Expansion") {
+      hudStateRef.current.textContent = "Cosmic Filament Expansion";
+    }
   };
 
   const drawSolarSystem = (ctx: CanvasRenderingContext2D, width: number, height: number, timeVal: number) => {
     const cx = width / 2;
     const cy = height / 2;
+    const simSpeedVal = simSpeedRef.current;
+    const gravityVal = gravityRef.current;
+    const maxParticlesVal = maxParticlesRef.current;
 
     // Draw Sun
     const sunGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 25);
@@ -498,7 +538,7 @@ export default function Simulator() {
       if (!dust.active) return;
       activeDustCount++;
 
-      dust.angle += dust.speed * simSpeed;
+      dust.angle += dust.speed * simSpeedVal;
       const x = cx + Math.cos(dust.angle) * dust.radius;
       const y = cy + Math.sin(dust.angle) * dust.radius * 0.75;
 
@@ -507,11 +547,14 @@ export default function Simulator() {
       ctx.arc(x, y, dust.size, 0, Math.PI * 2);
       ctx.fill();
 
-      // Accretion sweeping logic
+      // Accretion sweeping logic - optimized with distance squared to avoid Math.sqrt
       planetsRef.current.forEach((p) => {
         const px = cx + Math.cos(p.angle) * p.r;
         const py = cy + Math.sin(p.angle) * p.r * 0.75;
-        if (Math.hypot(x - px, y - py) < p.size + 4) {
+        const dx = x - px;
+        const dy = y - py;
+        const distLimit = p.size + 4;
+        if (dx * dx + dy * dy < distLimit * distLimit) {
           dust.active = false;
           p.dustEaten++;
           playPing();
@@ -522,7 +565,7 @@ export default function Simulator() {
 
     // Update and draw planets
     planetsRef.current.forEach((p) => {
-      p.angle += p.speed * (gravity * 0.8) * simSpeed;
+      p.angle += p.speed * (gravityVal * 0.8) * simSpeedVal;
       const px = cx + Math.cos(p.angle) * p.r;
       const py = cy + Math.sin(p.angle) * p.r * 0.75;
 
@@ -575,9 +618,14 @@ export default function Simulator() {
       ctx.restore();
     });
 
-    const sweepProgress = ((maxParticles - activeDustCount) / maxParticles) * 100;
-    setHudDensity(`Accretion Swept: ${sweepProgress.toFixed(0)}%`);
-    setHudState("Accretion Disk Orbiting Sun");
+    const sweepProgress = ((maxParticlesVal - activeDustCount) / (maxParticlesVal || 1)) * 100;
+    
+    if (hudDensityRef.current) {
+      hudDensityRef.current.textContent = `Accretion Swept: ${sweepProgress.toFixed(0)}%`;
+    }
+    if (hudStateRef.current && hudStateRef.current.textContent !== "Accretion Disk Orbiting Sun") {
+      hudStateRef.current.textContent = "Accretion Disk Orbiting Sun";
+    }
   };
 
   const drawSphericalMap = (ctx: CanvasRenderingContext2D, img: HTMLImageElement | null, cx: number, cy: number, r: number, rotation: number) => {
@@ -599,7 +647,7 @@ export default function Simulator() {
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
 
-    const N = 50; // Slices
+    const N = 36; // Slices reduced from 50 to 36 for drawing speedup
     const sw = img.width / N;
 
     for (let i = 0; i < N; i++) {
@@ -630,9 +678,10 @@ export default function Simulator() {
     const cx = width / 2;
     const cy = height / 2;
     const r = 85;
+    const simSpeedVal = simSpeedRef.current;
 
-    moonAngleRef.current += 0.025 * simSpeed;
-    earthRotationRef.current += 0.08 * simSpeed;
+    moonAngleRef.current += 0.025 * simSpeedVal;
+    earthRotationRef.current += 0.08 * simSpeedVal;
 
     const moonX = cx + Math.cos(moonAngleRef.current) * 200;
     const moonY = cy + Math.sin(moonAngleRef.current) * 55;
@@ -696,11 +745,16 @@ export default function Simulator() {
 
     if (!moonIsBehind) drawMoon();
 
-    setHudDensity("Atmosphere: Stable (1.0 atm)");
-    setHudState("Active Earth & Moon Orbit");
+    if (hudDensityRef.current && hudDensityRef.current.textContent !== "Atmosphere: Stable (1.0 atm)") {
+      hudDensityRef.current.textContent = "Atmosphere: Stable (1.0 atm)";
+    }
+    if (hudStateRef.current && hudStateRef.current.textContent !== "Active Earth & Moon Orbit") {
+      hudStateRef.current.textContent = "Active Earth & Moon Orbit";
+    }
   };
 
   const drawBiosphere = (ctx: CanvasRenderingContext2D, width: number, height: number, timeVal: number) => {
+    const simSpeedVal = simSpeedRef.current;
     // Background gradient
     const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
     skyGrad.addColorStop(0, "#020005");
@@ -730,8 +784,8 @@ export default function Simulator() {
 
     // Fireflies rising
     firefliesRef.current.forEach((f) => {
-      f.y -= f.speedY * simSpeed;
-      f.angle += f.pulseSpeed * simSpeed;
+      f.y -= f.speedY * simSpeedVal;
+      f.angle += f.pulseSpeed * simSpeedVal;
       f.x += Math.sin(f.angle) * 0.3;
 
       if (f.y < height - 220) {
@@ -838,8 +892,12 @@ export default function Simulator() {
     ctx.fillStyle = `rgba(0, 242, 254, ${textOpacity})`;
     ctx.fillText("— Carl Sagan", width / 2, 80);
 
-    setHudDensity("Observation Phase: Active");
-    setHudState("Humanity Observing Universe");
+    if (hudDensityRef.current && hudDensityRef.current.textContent !== "Observation Phase: Active") {
+      hudDensityRef.current.textContent = "Observation Phase: Active";
+    }
+    if (hudStateRef.current && hudStateRef.current.textContent !== "Humanity Observing Universe") {
+      hudStateRef.current.textContent = "Humanity Observing Universe";
+    }
   };
 
   // --- CORE ANIMATION LOOP ---
@@ -851,6 +909,7 @@ export default function Simulator() {
 
     const width = canvas.width / (window.devicePixelRatio || 1);
     const height = canvas.height / (window.devicePixelRatio || 1);
+    const simSpeedVal = simSpeedRef.current;
 
     // Smear or clear canvas depending on phase
     if (timeVal < 6.5) {
@@ -907,16 +966,20 @@ export default function Simulator() {
     }
 
     // Tick clock
-    let nextTime = timeVal + 0.025 * simSpeed;
+    let nextTime = timeVal + 0.025 * simSpeedVal;
     if (nextTime > 13.8) {
       nextTime = 13.8;
-      setCosmicTime(13.8);
+      if (hudTimeRef.current) {
+        hudTimeRef.current.textContent = "Cosmic Time: 13.8B yrs (Present)";
+      }
       drawBiosphere(ctx, width, height, 13.8);
       animationFrameIdRef.current = requestAnimationFrame(() => runLoop(13.8));
       return;
     }
 
-    setCosmicTime(nextTime);
+    if (hudTimeRef.current) {
+      hudTimeRef.current.textContent = `Cosmic Time: ${nextTime.toFixed(2)}B yrs`;
+    }
     animationFrameIdRef.current = requestAnimationFrame(() => runLoop(nextTime));
   };
 
@@ -932,6 +995,11 @@ export default function Simulator() {
     if (!canvas) return;
     const width = canvas.width / (window.devicePixelRatio || 1);
     const height = canvas.height / (window.devicePixelRatio || 1);
+
+    // Initialize HUD texts to prevent layout layout shifts or stale texts
+    if (hudTimeRef.current) hudTimeRef.current.textContent = "Cosmic Time: 0.00B yrs";
+    if (hudStateRef.current) hudStateRef.current.textContent = "Singularity Expansion";
+    if (hudDensityRef.current) hudDensityRef.current.textContent = "Cluster Formation: 0%";
 
     // Run set-up
     setupCosmicWeb(width, height);
@@ -983,9 +1051,72 @@ export default function Simulator() {
     resizeCanvas();
     return () => {
       window.removeEventListener("resize", resizeCanvas);
-      if (animationFrameIdRef.current) cancelAnimationFrame(animationFrameIdRef.current);
     };
-  }, [maxParticles, darkEnergy, gravity]);
+  }, []);
+
+  // Dynamically scale particles in the active simulation when maxParticles changes
+  useEffect(() => {
+    if (!isRunning) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const width = canvas.width / (window.devicePixelRatio || 1);
+    const height = canvas.height / (window.devicePixelRatio || 1);
+
+    // Adjust Cosmic Web particles
+    let webParts = cosmicWebParticlesRef.current;
+    if (webParts.length > 0) {
+      if (maxParticles < webParts.length) {
+        cosmicWebParticlesRef.current = webParts.slice(0, maxParticles);
+      } else if (maxParticles > webParts.length) {
+        const colors = [
+          "rgba(0, 242, 254, 0.75)",
+          "rgba(127, 0, 255, 0.75)",
+          "rgba(255, 0, 127, 0.75)",
+          "rgba(79, 172, 254, 0.75)",
+          "rgba(255, 255, 255, 0.85)",
+        ];
+        const added = maxParticles - webParts.length;
+        const newParts = [...webParts];
+        for (let i = 0; i < added; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const velocity = Math.random() * 4 + 1.2;
+          newParts.push({
+            x: width / 2,
+            y: height / 2,
+            vx: Math.cos(angle) * velocity,
+            vy: Math.sin(angle) * velocity,
+            mass: Math.random() * 2 + 0.5,
+            color: colors[Math.floor(Math.random() * colors.length)],
+          });
+        }
+        cosmicWebParticlesRef.current = newParts;
+      }
+    }
+
+    // Adjust Accretion Dust particles
+    let dustParts = accretionDustRef.current;
+    if (dustParts.length > 0) {
+      if (maxParticles < dustParts.length) {
+        accretionDustRef.current = dustParts.slice(0, maxParticles);
+      } else if (maxParticles > dustParts.length) {
+        const added = maxParticles - dustParts.length;
+        const newDust = [...dustParts];
+        for (let i = 0; i < added; i++) {
+          const r = 45 + Math.random() * 230;
+          const angle = Math.random() * Math.PI * 2;
+          newDust.push({
+            radius: r,
+            angle: angle,
+            speed: (0.02 / Math.sqrt(r)) * (Math.random() * 0.3 + 0.85) * (gravityRef.current * 0.8),
+            size: Math.random() * 1.5 + 0.5,
+            color: Math.random() > 0.4 ? "rgba(166, 162, 191, 0.45)" : "rgba(216, 202, 157, 0.4)",
+            active: true,
+          });
+        }
+        accretionDustRef.current = newDust;
+      }
+    }
+  }, [maxParticles, isRunning]);
 
   return (
     <section id="sandbox" className="py-24 max-w-[1200px] mx-auto px-6 scroll-mt-12">
@@ -1086,11 +1217,11 @@ export default function Simulator() {
 
             {/* HUD Status Bar footer */}
             <div className="absolute bottom-0 left-0 w-full px-6 py-3 border-t border-white/5 bg-[#04020a]/80 backdrop-blur-md flex flex-wrap gap-4 items-center justify-between text-[11px] font-heading font-semibold text-neutral-300">
-              <span className="text-cyan-400 uppercase tracking-wider">{hudState}</span>
-              <span className="text-white font-mono uppercase tracking-wider">
-                Cosmic Time: {cosmicTime === 13.8 ? "13.8B yrs (Present)" : `${cosmicTime.toFixed(2)}B yrs`}
+              <span ref={hudStateRef} className="text-cyan-400 uppercase tracking-wider">Idle</span>
+              <span ref={hudTimeRef} className="text-white font-mono uppercase tracking-wider">
+                Cosmic Time: 0.00B yrs
               </span>
-              <span className="text-neutral-400 uppercase tracking-wider">{hudDensity}</span>
+              <span ref={hudDensityRef} className="text-neutral-400 uppercase tracking-wider">0%</span>
             </div>
           </div>
         </div>

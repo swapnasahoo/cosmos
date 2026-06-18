@@ -15,92 +15,62 @@ interface Epoch {
 }
 
 const stats = [
-  { value: "13.8B", label: "Years Since Genesis" },
-  { value: "10³² K", label: "Initial Temperature" },
-  { value: "Infinite", label: "Current Expansion" },
-  { value: "98%", label: "H & He Atoms" },
+  { value: "1947", label: "Computing Genesis" },
+  { value: "10¹²", label: "LLM Parameters" },
+  { value: "Global", label: "Network Coverage" },
+  { value: "100x", label: "Annual Compute Growth" },
 ];
 
 const epochs: Epoch[] = [
   {
-    id: "planck",
+    id: "silicon",
     index: 1,
-    title: "Planck Epoch",
-    time: "0 to 10⁻⁴³ seconds",
-    temp: "10³² Kelvin",
+    title: "Silicon Genesis",
+    time: "1947 to 1970",
+    temp: "10¹ Transistors",
     image: "/images/hero.jpg",
-    text: "The earliest possible period of the universe. At this scale, the fabric of space and time is a foam-like quantum structure. All four fundamental forces of nature—Gravity, Electromagnetism, Strong Nuclear, and Weak Nuclear—are unified into a single, super-force.",
-    highlight: "Current physical theories (like general relativity and quantum mechanics) break down. We require a yet-unproved theory of \"Quantum Gravity\" to fully understand this epoch.",
+    text: "The birth of solid-state computing. The invention of the bipolar junction transistor at Bell Labs replaces fragile vacuum tubes, enabling the development of smaller, faster, and more reliable computers.",
+    highlight: "This epoch laid the mathematical and physical foundations of modern microprocessors and silicon logic gates.",
   },
   {
-    id: "inflation",
+    id: "internet",
     index: 2,
-    title: "Cosmic Inflation",
-    time: "10⁻³⁶ to 10⁻³² seconds",
-    temp: "10²⁸ Kelvin",
+    title: "Global Network",
+    time: "1970 to 2000",
+    temp: "10⁶ Connected Nodes",
     image: "/images/hero.jpg",
-    text: "A mysterious field triggers a super-exponential expansion of space. The universe expands by a factor of 10²⁶ in a fraction of a second, going from smaller than a proton to about the size of a grapefruit. This smoothens space out and seeds quantum fluctuations that will become galaxies.",
-    highlight: "Inflation solves major cosmological problems, explaining why the universe is so flat and uniform in all directions (the Horizon Problem).",
+    text: "The rise of personal computing and distributed networks. ARPANET evolves into the modern internet, and personal computers enter homes, establishing a globally connected intelligence substrate.",
+    highlight: "Humanity begins distributing information instantaneously, paving the way for massive decentralized datasets.",
   },
   {
-    id: "quark",
+    id: "deeplearning",
     index: 3,
-    title: "Quark Epoch",
-    time: "10⁻¹² to 10⁻⁶ seconds",
-    temp: "10¹⁵ Kelvin",
+    title: "Deep Learning Spark",
+    time: "2000 to 2020",
+    temp: "10⁹ Parameters",
     image: "/images/hero.jpg",
-    text: "The four fundamental forces separate into their modern forms. The universe is filled with a dense, hot plasma of elementary particles including quarks, leptons (like electrons), and gluons. It is too hot for quarks to bind together into protons and neutrons.",
-    highlight: "Quark-Gluon Plasma (QGP) is recreated today in high-energy particle accelerators like the Large Hadron Collider (LHC) at CERN.",
+    text: "The realization of artificial neural networks. Enabled by GPU hardware acceleration and massive datasets, algorithms learn to extract high-level abstractions, matching humans in vision and speech.",
+    highlight: "AlexNet's success in 2012 proves that scaling deep neural nets solves complex perception problems.",
   },
   {
-    id: "nucleo",
+    id: "generative",
     index: 4,
-    title: "Nucleosynthesis",
-    time: "1 second to 3 minutes",
-    temp: "10⁹ Kelvin",
-    image: "/images/hero.jpg",
-    text: "The universe has cooled enough for quarks to form protons and neutrons. Now, nuclear fusion takes place on a cosmic scale. Protons and neutrons fuse to create the first atomic nuclei: Hydrogen, Deuterium, Helium, and traces of Lithium.",
-    highlight: "After 20 minutes, the universe cools too much for fusion to continue. The ratio of Hydrogen (75%) and Helium (25%) is locked in, matching today's observations.",
-  },
-  {
-    id: "cmb",
-    index: 5,
-    title: "Recombination (CMB)",
-    time: "380,000 years",
-    temp: "3,000 Kelvin",
+    title: "Generative Epoch",
+    time: "2020 to 2025",
+    temp: "10¹² Parameters",
     image: "/images/cmb.jpg",
-    text: "The universe has cooled sufficiently for electrons to bind to nuclei, forming the first stable atoms (neutral Hydrogen). Up to this point, the universe was an opaque plasma scattering light. Now, space becomes transparent, and the first light escapes, traveling freely.",
-    highlight: "This \"first light\" is observed today as the Cosmic Microwave Background (CMB)—the oldest radiation we can detect.",
+    text: "The rise of attention-based architectures and Large Language Models. AI systems transition from recognizing patterns to generating human-like text, code, imagery, and molecular designs.",
+    highlight: "Large language models demonstrate emergent reasoning and conversational interfaces, sparking global AI integration.",
   },
   {
-    id: "darkages",
-    index: 6,
-    title: "The Cosmic Dark Ages",
-    time: "380k to 150 million years",
-    temp: "3,000 to 60 Kelvin",
-    image: "/images/hero.jpg",
-    text: "After recombination, the universe is filled with neutral hydrogen gas, but no stars have ignited yet. There are no sources of light besides the gradually fading CMB. The universe is completely dark, but gravity is quietly pulling gas clouds together.",
-    highlight: "During this quiet era, clumps of dark matter grow larger, acting as gravitational anchors for the baryonic gas that will form the first galaxies.",
-  },
-  {
-    id: "stars",
-    index: 7,
-    title: "First Stars & Galaxies",
-    time: "150M to 1 billion years",
-    temp: "60 to 10 Kelvin",
+    id: "agi",
+    index: 5,
+    title: "Superintelligence Horizon",
+    time: "2025 and Beyond",
+    temp: "10¹⁵ Parameters",
     image: "/images/galaxy.jpg",
-    text: "Gravity succeeds in compressing hydrogen gas clouds until their cores reach critical fusion temperatures. The first generation of massive stars (Population III stars) ignite, ending the Dark Ages. Their intense ultraviolet radiation ionizes the surrounding hydrogen gas (Reionization).",
-    highlight: "These stars cluster together to form the very first proto-galaxies, visible today in deep-field images from the James Webb Space Telescope (JWST).",
-  },
-  {
-    id: "modern",
-    index: 8,
-    title: "The Modern Era",
-    time: "1 billion years to Present",
-    temp: "2.7 Kelvin",
-    image: "/images/galaxy.jpg",
-    text: "Galaxies merge and grow. Generations of stars live and die, enriching the cosmos with heavy elements (carbon, oxygen, iron) through supernovas. Around 9 billion years after the Big Bang (4.6 billion years ago), our Sun and Solar System form from a recycled nebula.",
-    highlight: "Today, the universe is 13.8 billion years old, containing trillions of galaxies. Cosmic expansion is accelerating due to Dark Energy.",
+    text: "The convergence of quantum computing, advanced reinforcement learning, and neuromorphic chips. Autonomous agents achieve human-level general intelligence, starting recursive self-improvement loops.",
+    highlight: "Artificial General Intelligence (AGI) becomes the new cognitive foundation of humanity, accelerating scientific discovery.",
   },
 ];
 
@@ -144,13 +114,13 @@ export default function Chronology() {
       <section id="timeline" className="py-24 max-w-[1200px] mx-auto px-6 scroll-mt-12">
         <div className="text-center flex flex-col items-center gap-4 mb-16">
           <span className="text-[10px] font-semibold tracking-[0.3em] uppercase text-cyan-400 font-heading bg-cyan-400/10 px-4 py-1.5 rounded-full border border-cyan-400/20 shadow-[0_0_15px_rgba(0,242,254,0.1)]">
-            COSMIC CHRONOLOGY
+            EVOLUTION OF INTELLIGENCE
           </span>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold font-heading text-white tracking-tight uppercase">
-            Timeline of the Universe
+            Epochs of Computing
           </h2>
-          <p className="text-sm sm:text-base text-neutral-400 max-w-[600px] font-light">
-            Trace the stages of the cosmos from the subatomic fury of the first microsecond to the formation of galaxies, stars, and life.
+          <p className="text-xs sm:text-sm text-neutral-400 max-w-[540px] font-light leading-relaxed">
+            From solid-state transistors and global networking to deep learning scaling and the superintelligence horizon, explore the key milestones of computing.
           </p>
         </div>
 

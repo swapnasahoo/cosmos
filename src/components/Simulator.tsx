@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Play, RotateCcw } from "lucide-react";
+import { Play, RotateCcw, Volume2, VolumeX, Mic, MicOff } from "lucide-react";
 
 interface CosmicParticleType {
   x: number;

@@ -4,6 +4,7 @@ import Hero from "@/components/Hero";
 import Chronology from "@/components/Chronology";
 import CmbExplorer from "@/components/CmbExplorer";
 import Simulator from "@/components/Simulator";
+import Faq from "@/components/Faq";
 
 export default function Home() {
   return (
@@ -15,9 +16,7 @@ export default function Home() {
         <Chronology />
         <CmbExplorer />
         <Simulator />
-        <section id="faq" className="min-h-screen border-t border-white/5 bg-black/30 flex items-center justify-center">
-          <h2 className="text-2xl font-bold font-heading text-neutral-400">Cosmic Q&A Section (Loading...)</h2>
-        </section>
+        <Faq />
       </main>
     </>
   );

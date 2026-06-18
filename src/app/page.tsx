@@ -2,6 +2,7 @@ import Starfield from "@/components/Starfield";
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import Chronology from "@/components/Chronology";
+import CmbExplorer from "@/components/CmbExplorer";
 
 export default function Home() {
   return (
@@ -11,12 +12,7 @@ export default function Home() {
       <main className="relative z-10 flex flex-col min-h-screen">
         <Hero />
         <Chronology />
-        <section id="cmb" className="min-h-screen border-t border-white/5 bg-black/20 flex items-center justify-center">
-          <h2 className="text-2xl font-bold font-heading text-neutral-400">CMB Echo Section (Loading...)</h2>
-        </section>
-        <section id="evidence" className="min-h-screen border-t border-white/5 bg-black/30 flex items-center justify-center">
-          <h2 className="text-2xl font-bold font-heading text-neutral-400">Evidence Section (Loading...)</h2>
-        </section>
+        <CmbExplorer />
         <section id="sandbox" className="min-h-screen border-t border-white/5 bg-black/20 flex items-center justify-center">
           <h2 className="text-2xl font-bold font-heading text-neutral-400">Simulator Section (Loading...)</h2>
         </section>

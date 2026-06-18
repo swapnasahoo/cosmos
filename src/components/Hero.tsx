@@ -24,15 +24,15 @@ export default function Hero() {
 
       <div className="max-w-[800px] text-center flex flex-col items-center gap-6">
         <span className="text-[10px] font-semibold tracking-[0.35em] uppercase text-cyan-400 font-heading bg-cyan-400/10 px-4 py-1.5 rounded-full border border-cyan-400/20 shadow-[0_0_15px_rgba(0,242,254,0.1)]">
-          EPOCHS OF COMPUTING & AI
+          THE ORIGIN OF SPACE & TIME
         </span>
 
         <h1 className="text-5xl sm:text-7xl md:text-8xl font-black font-heading text-white tracking-tighter leading-none select-none uppercase text-neon-cyan animate-pulse-slow">
-          NEURAL GENESIS
+          THE BIG BANG
         </h1>
 
         <p className="text-sm sm:text-base text-neutral-300 leading-relaxed max-w-[620px] font-light">
-          From vacuum tubes and transistors to artificial general intelligence, trace the evolution of neural networks and run synaptic token velocity simulations.
+          13.8 billion years ago, the universe exploded from an infinitely dense, hot point. Not an explosion in space, but an expansion of space itself.
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-4 mt-4">

@@ -10,7 +10,9 @@ import {
   deletePost, 
   BlogPost, 
   User,
-  updateSystemSettings
+  updateSystemSettings,
+  createComment,
+  deleteComment
 } from "@/lib/db";
 
 // Helper to generate a slug from a title
@@ -336,5 +338,40 @@ export async function saveSettingsAction(prevState: any, formData: FormData) {
   } catch (err: any) {
     console.error("Save settings action error:", err);
     return { error: err.message || "Failed to save settings." };
+  }
+}
+
+// 6. Comments Actions
+export async function submitCommentAction(prevState: any, formData: FormData) {
+  const postId = formData.get("postId")?.toString();
+  const authorName = formData.get("authorName")?.toString().trim();
+  const content = formData.get("content")?.toString().trim();
+
+  if (!postId || !authorName || !content) {
+    return { error: "Please fill in both name and comment content." };
+  }
+
+  try {
+    await createComment(postId, authorName, content);
+    revalidatePath(`/blog`);
+    return { success: true, message: "Comment posted successfully!" };
+  } catch (err: any) {
+    console.error("Submit comment error:", err);
+    return { error: err.message || "Failed to submit comment." };
+  }
+}
+
+export async function deleteCommentAction(id: string) {
+  const session = await getSession();
+  if (!session || session.role !== "admin") {
+    return { error: "Unauthorized. Admin privileges required." };
+  }
+
+  try {
+    await deleteComment(id);
+    return { success: true };
+  } catch (err: any) {
+    console.error("Delete comment error:", err);
+    return { error: err.message || "Failed to delete comment." };
   }
 }

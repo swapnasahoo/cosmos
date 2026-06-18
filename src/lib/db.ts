@@ -232,3 +232,85 @@ export async function updateSystemSettings(settings: Partial<SystemSettings>): P
     throw new Error(err.message || "Database update failed");
   }
 }
+
+// --- COMMENTS ACCESS ---
+export interface BlogPostComment {
+  id: string;
+  postId: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+}
+
+export async function getCommentsForPost(postId: string): Promise<BlogPostComment[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("comments")
+      .select("*")
+      .eq("post_id", postId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching comments from Supabase:", error);
+      return [];
+    }
+    return (data || []).map((c) => ({
+      id: c.id,
+      postId: c.post_id,
+      authorName: c.author_name,
+      content: c.content,
+      createdAt: c.created_at,
+    }));
+  } catch (err) {
+    console.error("getCommentsForPost failed:", err);
+    return [];
+  }
+}
+
+export async function getAllComments(): Promise<(BlogPostComment & { postTitle: string })[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("comments")
+      .select("*, posts(title)")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching all comments from Supabase:", error);
+      return [];
+    }
+    return (data || []).map((c) => ({
+      id: c.id,
+      postId: c.post_id,
+      authorName: c.author_name,
+      content: c.content,
+      createdAt: c.created_at,
+      postTitle: (c.posts as any)?.title || "Unknown Article",
+    }));
+  } catch (err) {
+    console.error("getAllComments failed:", err);
+    return [];
+  }
+}
+
+export async function createComment(postId: string, authorName: string, content: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("comments").insert({
+    post_id: postId,
+    author_name: authorName,
+    content: content,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteComment(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("comments").delete().eq("id", id);
+  if (error) {
+    throw new Error(error.message);
+  }
+}

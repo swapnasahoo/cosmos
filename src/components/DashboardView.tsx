@@ -9,7 +9,8 @@ import {
   deleteUserAction, 
   changePasswordAction,
   togglePostStatusAction,
-  saveSettingsAction
+  saveSettingsAction,
+  deleteCommentAction
 } from "@/app/admin/actions";
 import { 
   FileText, 
@@ -24,25 +25,34 @@ import {
   Check,
   AlertCircle,
   Settings as SettingsIcon,
-  RefreshCw
+  RefreshCw,
+  MessageSquare
 } from "lucide-react";
 import { SessionPayload } from "@/lib/auth";
-import { BlogPost, User, SystemSettings } from "@/lib/db";
+import { BlogPost, User, SystemSettings, BlogPostComment } from "@/lib/db";
 
 interface DashboardViewProps {
   session: SessionPayload;
   initialPosts: BlogPost[];
   initialUsers: User[];
   initialSettings: SystemSettings;
+  initialComments?: (BlogPostComment & { postTitle: string })[];
 }
 
-export default function DashboardView({ session, initialPosts, initialUsers, initialSettings }: DashboardViewProps) {
-  const [activeTab, setActiveTab] = useState<"posts" | "users" | "password" | "settings">("posts");
+export default function DashboardView({ 
+  session, 
+  initialPosts, 
+  initialUsers, 
+  initialSettings,
+  initialComments = []
+}: DashboardViewProps) {
+  const [activeTab, setActiveTab] = useState<"posts" | "users" | "password" | "settings" | "comments">("posts");
   
   // Data list states
   const [posts, setPosts] = useState<BlogPost[]>(initialPosts);
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [settings, setSettings] = useState<SystemSettings>(initialSettings);
+  const [comments, setComments] = useState<(BlogPostComment & { postTitle: string })[]>(initialComments);
 
   // Post Modal states
   const [postModalOpen, setPostModalOpen] = useState(false);
@@ -104,6 +114,17 @@ export default function DashboardView({ session, initialPosts, initialUsers, ini
         siteDescription: formData.get("siteDescription")?.toString() || "",
         allowSignups: formData.get("allowSignups") === "true",
       });
+    }
+  };
+
+  // Delete Comment Handler
+  const handleDeleteComment = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this comment?")) return;
+    const res = await deleteCommentAction(id);
+    if (res.error) {
+      alert(res.error);
+    } else {
+      setComments(comments.filter((c) => c.id !== id));
     }
   };
 
@@ -292,6 +313,17 @@ export default function DashboardView({ session, initialPosts, initialUsers, ini
                 >
                   <SettingsIcon className="w-4 h-4" />
                   System Settings
+                </button>
+                <button
+                  onClick={() => setActiveTab("comments")}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border font-heading text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    activeTab === "comments"
+                      ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+                      : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Comments Moderation
                 </button>
               </>
             )}
@@ -689,6 +721,71 @@ export default function DashboardView({ session, initialPosts, initialUsers, ini
             </div>
           </div>
         )}
+
+        {/* TAB 5: COMMENTS MODERATION TAB (Admin only) */}
+        {activeTab === "comments" && session.role === "admin" && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h1 className="text-2xl font-black font-heading tracking-wide uppercase text-white">
+                Comments Moderation
+              </h1>
+              <p className="text-xs text-neutral-400 font-light mt-1">
+                Review, manage, and moderate reader comments across all blog articles.
+              </p>
+            </div>
+
+            {/* Comments Table */}
+            <div className="glass-panel border-white/5 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/5 text-[10px] font-bold text-neutral-400 uppercase tracking-wider bg-white/2">
+                      <th className="p-4 pl-6">Author & Post</th>
+                      <th className="p-4">Comment Text</th>
+                      <th className="p-4">Date</th>
+                      <th className="p-4 pr-6 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comments.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="p-8 text-center text-neutral-500 font-light font-heading">
+                          No comments found on any articles.
+                        </td>
+                      </tr>
+                    ) : (
+                      comments.map((comment) => (
+                        <tr key={comment.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                          <td className="p-4 pl-6 max-w-[200px]">
+                            <span className="font-bold text-white text-sm block tracking-wide truncate">{comment.authorName}</span>
+                            <span className="text-[10px] text-cyan-400 font-mono block mt-0.5 truncate" title={comment.postTitle}>
+                              On: {comment.postTitle}
+                            </span>
+                          </td>
+                          <td className="p-4 text-neutral-300 font-light leading-relaxed max-w-[400px]">
+                            <p className="whitespace-pre-wrap line-clamp-3">{comment.content}</p>
+                          </td>
+                          <td className="p-4 text-neutral-400 font-mono">
+                            {new Date(comment.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="p-4 pr-6 text-right">
+                            <button
+                              onClick={() => handleDeleteComment(comment.id)}
+                              className="p-2 rounded-lg border border-white/5 hover:border-red-500/20 bg-white/3 text-neutral-400 hover:text-red-400 cursor-pointer transition-all"
+                              title="Delete Comment"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* --- MODEL WINDOWS (OVERLAYS) --- */}
@@ -741,18 +838,50 @@ export default function DashboardView({ session, initialPosts, initialUsers, ini
                 {/* Cover Image */}
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-semibold text-neutral-400 uppercase tracking-widest font-heading" htmlFor="post-cover">
-                    Cover Image Path
+                    Cover Image URL or Path
                   </label>
-                  <select
+                  <input
                     id="post-cover"
                     name="coverImage"
+                    type="text"
+                    required
                     defaultValue={editingPost?.coverImage || "/images/galaxy.jpg"}
-                    className="w-full px-4 py-3 rounded-xl border border-white/5 bg-[#09061c] focus:border-cyan-500 focus:outline-none text-sm text-white cursor-pointer"
-                  >
-                    <option value="/images/galaxy.jpg">Cosmic Galaxy (Default)</option>
-                    <option value="/images/cmb.jpg">Cosmic Microwave Background</option>
-                    <option value="/images/hero.jpg">Deep Space Graphic</option>
-                  </select>
+                    className="w-full px-4 py-3 rounded-xl border border-white/5 bg-[#0b071e]/40 focus:border-cyan-500 focus:outline-none text-sm text-white"
+                    placeholder="e.g. /images/galaxy.jpg or https://..."
+                  />
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    <span className="text-[9px] text-neutral-500 font-light self-center">Presets:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById("post-cover") as HTMLInputElement;
+                        if (input) input.value = "/images/galaxy.jpg";
+                      }}
+                      className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/5 text-[9px] font-mono text-cyan-400 cursor-pointer"
+                    >
+                      Galaxy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById("post-cover") as HTMLInputElement;
+                        if (input) input.value = "/images/cmb.jpg";
+                      }}
+                      className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/5 text-[9px] font-mono text-cyan-400 cursor-pointer"
+                    >
+                      CMB
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById("post-cover") as HTMLInputElement;
+                        if (input) input.value = "/images/hero.jpg";
+                      }}
+                      className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/5 text-[9px] font-mono text-cyan-400 cursor-pointer"
+                    >
+                      Deep Space
+                    </button>
+                  </div>
                 </div>
               </div>
 

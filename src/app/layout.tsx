@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Outfit, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import { getSystemSettings } from "@/lib/db";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -14,10 +15,13 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["300", "400", "500", "600", "700"],
 });
 
-export const metadata: Metadata = {
-  title: "The Big Bang Theory | Cosmological Simulator & Chronology",
-  description: "Explore the origin of the cosmos: from the Planck Epoch and Cosmic Microwave Background to N-body expansion simulators, Keplerian planet accretion, and the rise of humanity.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSystemSettings();
+  return {
+    title: `${settings.siteName} | Cosmological Simulator & Chronology`,
+    description: settings.siteDescription || "Explore the origin of the cosmos: from the Planck Epoch and Cosmic Microwave Background to N-body expansion simulators, Keplerian planet accretion, and the rise of humanity.",
+  };
+}
 
 export default function RootLayout({
   children,

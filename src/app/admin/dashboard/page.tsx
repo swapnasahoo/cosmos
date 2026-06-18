@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getPosts, getUsers, getSystemSettings } from "@/lib/db";
+import { getPosts, getUsers, getSystemSettings, getAllComments } from "@/lib/db";
 import DashboardView from "@/components/DashboardView";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +15,7 @@ export default async function DashboardPage() {
   const posts = await getPosts();
   const users = session.role === "admin" ? await getUsers() : [];
   const settings = await getSystemSettings();
+  const comments = session.role === "admin" ? await getAllComments() : [];
 
   return (
     <DashboardView 
@@ -22,6 +23,7 @@ export default async function DashboardPage() {
       initialPosts={posts} 
       initialUsers={users} 
       initialSettings={settings}
+      initialComments={comments}
     />
   );
 }

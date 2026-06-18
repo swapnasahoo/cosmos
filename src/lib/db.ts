@@ -188,8 +188,8 @@ export async function getSystemSettings(): Promise<SystemSettings> {
 
     if (error || !data) {
       return {
-        siteName: "AI Basics",
-        siteDescription: "Simple, jargon-free guides to Artificial Intelligence, Machine Learning, and Deep Learning for beginners.",
+        siteName: "COSMOS",
+        siteDescription: "Chronicle of cosmological discoveries and simulator controls.",
         allowSignups: false,
       };
     }
@@ -201,8 +201,8 @@ export async function getSystemSettings(): Promise<SystemSettings> {
     };
   } catch {
     return {
-      siteName: "AI Basics",
-      siteDescription: "Simple, jargon-free guides to Artificial Intelligence, Machine Learning, and Deep Learning for beginners.",
+      siteName: "COSMOS",
+      siteDescription: "Chronicle of cosmological discoveries and simulator controls.",
       allowSignups: false,
     };
   }

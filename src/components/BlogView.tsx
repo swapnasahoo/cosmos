@@ -34,13 +34,13 @@ export default function BlogView({ initialPosts, siteName, siteDescription }: Bl
       {/* Blog Hero Section */}
       <section className="max-w-[1200px] mx-auto px-6 w-full flex flex-col gap-6 text-center items-center pb-12">
         <span className="text-[10px] font-semibold tracking-[0.3em] uppercase text-cyan-400 font-heading bg-cyan-400/10 px-4 py-1.5 rounded-full border border-cyan-400/20 shadow-[0_0_15px_rgba(0,242,254,0.1)]">
-          AI KNOWLEDGE BASE
+          COSMIC ARCHIVES
         </span>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-black font-heading text-white tracking-tight uppercase leading-none">
-          The {siteName || "AI"} Chronicle
+          The {siteName || "Cosmic"} Chronicle
         </h1>
         <p className="text-sm sm:text-base text-neutral-400 max-w-[620px] font-light leading-relaxed">
-          {siteDescription || "Simple, jargon-free guides to Artificial Intelligence, Machine Learning, and Deep Learning for beginners."}
+          {siteDescription || "Discover stories and papers about cosmology, astrophysics, the early universe, stellar accretion, and observations of the cosmic background."}
         </p>
 
         {/* Search Input bar */}

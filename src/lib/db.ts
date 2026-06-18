@@ -169,3 +169,66 @@ export async function deletePost(id: string): Promise<void> {
     throw new Error(error.message);
   }
 }
+
+// --- SYSTEM SETTINGS ---
+export interface SystemSettings {
+  id?: string;
+  siteName: string;
+  siteDescription: string;
+  allowSignups: boolean;
+}
+
+export async function getSystemSettings(): Promise<SystemSettings> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("settings")
+      .select("*")
+      .maybeSingle();
+
+    if (error || !data) {
+      return {
+        siteName: "COSMOS",
+        siteDescription: "Chronicle of cosmological discoveries and simulator controls.",
+        allowSignups: false,
+      };
+    }
+    return {
+      id: data.id,
+      siteName: data.site_name,
+      siteDescription: data.site_description,
+      allowSignups: data.allow_signups,
+    };
+  } catch {
+    return {
+      siteName: "COSMOS",
+      siteDescription: "Chronicle of cosmological discoveries and simulator controls.",
+      allowSignups: false,
+    };
+  }
+}
+
+export async function updateSystemSettings(settings: Partial<SystemSettings>): Promise<void> {
+  const supabase = await createClient();
+  const dbData = {
+    site_name: settings.siteName,
+    site_description: settings.siteDescription,
+    allow_signups: settings.allowSignups,
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    const { data: existing } = await supabase.from("settings").select("id").maybeSingle();
+
+    if (existing) {
+      const { error } = await supabase.from("settings").update(dbData).eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase.from("settings").insert(dbData);
+      if (error) throw new Error(error.message);
+    }
+  } catch (err: any) {
+    console.error("updateSystemSettings failed:", err);
+    throw new Error(err.message || "Database update failed");
+  }
+}

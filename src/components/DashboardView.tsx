@@ -7,7 +7,9 @@ import {
   deletePostAction, 
   saveUserAction, 
   deleteUserAction, 
-  changePasswordAction 
+  changePasswordAction,
+  togglePostStatusAction,
+  saveSettingsAction
 } from "@/app/admin/actions";
 import { 
   FileText, 
@@ -20,23 +22,27 @@ import {
   X, 
   Globe,
   Check,
-  AlertCircle
+  AlertCircle,
+  Settings as SettingsIcon,
+  RefreshCw
 } from "lucide-react";
 import { SessionPayload } from "@/lib/auth";
-import { BlogPost, User } from "@/lib/db";
+import { BlogPost, User, SystemSettings } from "@/lib/db";
 
 interface DashboardViewProps {
   session: SessionPayload;
   initialPosts: BlogPost[];
   initialUsers: User[];
+  initialSettings: SystemSettings;
 }
 
-export default function DashboardView({ session, initialPosts, initialUsers }: DashboardViewProps) {
-  const [activeTab, setActiveTab] = useState<"posts" | "users" | "password">("posts");
+export default function DashboardView({ session, initialPosts, initialUsers, initialSettings }: DashboardViewProps) {
+  const [activeTab, setActiveTab] = useState<"posts" | "users" | "password" | "settings">("posts");
   
   // Data list states
   const [posts, setPosts] = useState<BlogPost[]>(initialPosts);
   const [users, setUsers] = useState<User[]>(initialUsers);
+  const [settings, setSettings] = useState<SystemSettings>(initialSettings);
 
   // Post Modal states
   const [postModalOpen, setPostModalOpen] = useState(false);
@@ -56,6 +62,50 @@ export default function DashboardView({ session, initialPosts, initialUsers }: D
   const [passError, setPassError] = useState("");
   const [passSuccess, setPassSuccess] = useState("");
   const [passLoading, setPassLoading] = useState(false);
+
+  // Settings tab states
+  const [settingsError, setSettingsError] = useState("");
+  const [settingsSuccess, setSettingsSuccess] = useState("");
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [togglingPostId, setTogglingPostId] = useState<string | null>(null);
+
+  // Toggle Blog Post Status
+  const handleTogglePostStatus = async (id: string) => {
+    if (session.role !== "admin") return;
+    setTogglingPostId(id);
+    const res = await togglePostStatusAction(id);
+    setTogglingPostId(null);
+
+    if (res.error) {
+      alert(res.error);
+    } else if (res.success) {
+      setPosts(posts.map((p) => p.id === id ? { ...p, published: res.published ?? p.published } : p));
+    }
+  };
+
+  // Handle Settings Submit
+  const handleSettingsSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSettingsLoading(true);
+    setSettingsError("");
+    setSettingsSuccess("");
+
+    const formData = new FormData(e.currentTarget);
+    const res = await saveSettingsAction(null, formData);
+
+    setSettingsLoading(false);
+    if (res.error) {
+      setSettingsError(res.error);
+    } else {
+      setSettingsSuccess(res.message || "Settings updated successfully!");
+      // Update local state
+      setSettings({
+        siteName: formData.get("siteName")?.toString() || "COSMOS",
+        siteDescription: formData.get("siteDescription")?.toString() || "",
+        allowSignups: formData.get("allowSignups") === "true",
+      });
+    }
+  };
 
   // Handle Logout
   const handleLogout = async () => {
@@ -220,17 +270,30 @@ export default function DashboardView({ session, initialPosts, initialUsers }: D
             </button>
 
             {session.role === "admin" && (
-              <button
-                onClick={() => setActiveTab("users")}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl border font-heading text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "users"
-                    ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
-                    : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                <UsersIcon className="w-4 h-4" />
-                Writers / Users
-              </button>
+              <>
+                <button
+                  onClick={() => setActiveTab("users")}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border font-heading text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    activeTab === "users"
+                      ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+                      : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <UsersIcon className="w-4 h-4" />
+                  Writers / Users
+                </button>
+                <button
+                  onClick={() => setActiveTab("settings")}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border font-heading text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    activeTab === "settings"
+                      ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+                      : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <SettingsIcon className="w-4 h-4" />
+                  System Settings
+                </button>
+              </>
             )}
 
             <button
@@ -308,52 +371,81 @@ export default function DashboardView({ session, initialPosts, initialUsers }: D
                         </td>
                       </tr>
                     ) : (
-                      posts.map((post) => (
-                        <tr key={post.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                          <td className="p-4 pl-6">
-                            <span className="font-bold text-white text-sm block tracking-wide">{post.title}</span>
-                            <span className="text-[10px] text-neutral-500 font-mono block mt-0.5 select-all">/{post.slug}</span>
-                          </td>
-                          <td className="p-4 font-medium text-neutral-300">
-                            {post.authorName}
-                            <span className="text-[9px] bg-white/5 border border-white/10 px-1.5 py-0.5 rounded font-mono block w-fit mt-0.5 uppercase tracking-wider text-neutral-500">
-                              {post.authorRole}
-                            </span>
-                          </td>
-                          <td className="p-4">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[9px] font-bold font-heading uppercase border ${
-                                post.published
-                                  ? "bg-green-500/10 text-green-400 border-green-500/20"
-                                  : "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
-                              }`}
-                            >
-                              {post.published ? "Published" : "Draft"}
-                            </span>
-                          </td>
-                          <td className="p-4 text-neutral-400 font-mono">
-                            {new Date(post.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="p-4 pr-6 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                onClick={() => openEditPostModal(post)}
-                                className="p-2 rounded-lg border border-white/5 hover:border-cyan-500/20 bg-white/3 text-neutral-400 hover:text-cyan-400 cursor-pointer transition-all"
-                                title="Edit"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeletePost(post.id)}
-                                className="p-2 rounded-lg border border-white/5 hover:border-red-500/20 bg-white/3 text-neutral-400 hover:text-red-400 cursor-pointer transition-all"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                      posts.map((post) => {
+                        const canManage = session.role === "admin" || post.authorId === session.userId;
+                        const isToggling = togglingPostId === post.id;
+                        
+                        return (
+                          <tr key={post.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                            <td className="p-4 pl-6">
+                              <span className="font-bold text-white text-sm block tracking-wide">{post.title}</span>
+                              <span className="text-[10px] text-neutral-500 font-mono block mt-0.5 select-all">/{post.slug}</span>
+                            </td>
+                            <td className="p-4 font-medium text-neutral-300">
+                              {post.authorName}
+                              <span className="text-[9px] bg-white/5 border border-white/10 px-1.5 py-0.5 rounded font-mono block w-fit mt-0.5 uppercase tracking-wider text-neutral-500">
+                                {post.authorRole}
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              {session.role === "admin" ? (
+                                <button
+                                  onClick={() => handleTogglePostStatus(post.id)}
+                                  disabled={isToggling}
+                                  className={`px-2 py-0.5 rounded-full text-[9px] font-bold font-heading uppercase border transition-all duration-200 flex items-center gap-1 cursor-pointer select-none hover:scale-[1.05] active:scale-[0.95] ${
+                                    post.published
+                                      ? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20"
+                                      : "bg-yellow-500/10 text-yellow-400 border-yellow-500/20 hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/20"
+                                  }`}
+                                  title="Click to toggle status (Publish / Stall)"
+                                >
+                                  {isToggling ? (
+                                    <RefreshCw className="w-2.5 h-2.5 animate-spin text-cyan-400" />
+                                  ) : null}
+                                  {post.published ? "Published" : "Stalled (Draft)"}
+                                </button>
+                              ) : (
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[9px] font-bold font-heading uppercase border ${
+                                    post.published
+                                      ? "bg-green-500/10 text-green-400 border-green-500/20"
+                                      : "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
+                                  }`}
+                                >
+                                  {post.published ? "Published" : "Draft"}
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-4 text-neutral-400 font-mono">
+                              {new Date(post.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="p-4 pr-6 text-right">
+                              <div className="flex justify-end gap-2">
+                                {canManage ? (
+                                  <>
+                                    <button
+                                      onClick={() => openEditPostModal(post)}
+                                      className="p-2 rounded-lg border border-white/5 hover:border-cyan-500/20 bg-white/3 text-neutral-400 hover:text-cyan-400 cursor-pointer transition-all"
+                                      title="Edit"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeletePost(post.id)}
+                                      className="p-2 rounded-lg border border-white/5 hover:border-red-500/20 bg-white/3 text-neutral-400 hover:text-red-400 cursor-pointer transition-all"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-[10px] text-neutral-500 font-mono italic select-none">Read-only</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -497,6 +589,101 @@ export default function DashboardView({ session, initialPosts, initialUsers }: D
                   className="mt-2 w-full py-3 rounded-xl bg-cyan-500 text-black font-heading font-black text-xs hover:bg-cyan-400 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                 >
                   {passLoading ? "SAVING..." : "UPDATE PASSWORD"}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: SYSTEM SETTINGS TAB (Admin only) */}
+        {activeTab === "settings" && session.role === "admin" && (
+          <div className="max-w-[540px]">
+            <h1 className="text-2xl font-black font-heading tracking-wide uppercase text-white mb-2">
+              System Settings
+            </h1>
+            <p className="text-xs text-neutral-400 font-light mb-6">
+              Configure global configurations, site metadata, and portal access variables.
+            </p>
+
+            <div className="glass-panel border-white/5 p-8 relative overflow-hidden bg-[#09061c]/40">
+              {settingsError && (
+                <div className="mb-6 p-3 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-xs font-semibold text-center font-heading">
+                  {settingsError}
+                </div>
+              )}
+              {settingsSuccess && (
+                <div className="mb-6 p-3 rounded-lg border border-green-500/20 bg-green-500/10 text-green-400 text-xs font-semibold text-center font-heading">
+                  {settingsSuccess}
+                </div>
+              )}
+
+              <form onSubmit={handleSettingsSubmit} className="flex flex-col gap-5">
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-semibold text-neutral-400 uppercase tracking-widest font-heading" htmlFor="siteName">
+                    Portal Site Name
+                  </label>
+                  <input
+                    id="siteName"
+                    name="siteName"
+                    type="text"
+                    required
+                    defaultValue={settings.siteName}
+                    className="w-full px-4 py-3 rounded-xl border border-white/5 bg-[#0b071e]/40 focus:border-cyan-500 focus:outline-none transition-all duration-300 text-sm font-heading text-white"
+                    placeholder="e.g. COSMOS"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-semibold text-neutral-400 uppercase tracking-widest font-heading" htmlFor="siteDescription">
+                    Chronicle Description tagline
+                  </label>
+                  <textarea
+                    id="siteDescription"
+                    name="siteDescription"
+                    rows={3}
+                    defaultValue={settings.siteDescription}
+                    className="w-full px-4 py-3 rounded-xl border border-white/5 bg-[#0b071e]/40 focus:border-cyan-500 focus:outline-none transition-all duration-300 text-sm font-heading text-white custom-scrollbar resize-none"
+                    placeholder="Brief description tagline..."
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-semibold text-neutral-400 uppercase tracking-widest font-heading">
+                    Allow Public Registrations
+                  </label>
+                  <div className="flex gap-4 mt-1">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-heading font-semibold text-white">
+                      <input
+                        type="radio"
+                        name="allowSignups"
+                        value="true"
+                        defaultChecked={settings.allowSignups === true}
+                        className="accent-cyan-500"
+                      />
+                      Enable Signups
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-heading font-semibold text-neutral-400 hover:text-white">
+                      <input
+                        type="radio"
+                        name="allowSignups"
+                        value="false"
+                        defaultChecked={settings.allowSignups !== true}
+                        className="accent-cyan-500"
+                      />
+                      Disable Signups (Recommended)
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-neutral-500 font-light mt-1">
+                    Note: To completely prevent signups, disable the &quot;Allow new users to sign up&quot; toggle in your Supabase Auth Providers settings.
+                  </span>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={settingsLoading}
+                  className="mt-4 w-full py-3 rounded-xl bg-cyan-500 text-black font-heading font-black text-xs hover:bg-cyan-400 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                >
+                  {settingsLoading ? "SAVING SETTINGS..." : "SAVE CONFIGURATION"}
                 </button>
               </form>
             </div>

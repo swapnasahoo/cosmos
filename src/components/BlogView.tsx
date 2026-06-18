@@ -8,9 +8,11 @@ import { BlogPost } from "@/lib/db";
 
 interface BlogViewProps {
   initialPosts: BlogPost[];
+  siteName?: string;
+  siteDescription?: string;
 }
 
-export default function BlogView({ initialPosts }: BlogViewProps) {
+export default function BlogView({ initialPosts, siteName, siteDescription }: BlogViewProps) {
   const [search, setSearch] = useState("");
 
   const filteredPosts = initialPosts.filter((post) => {
@@ -35,10 +37,10 @@ export default function BlogView({ initialPosts }: BlogViewProps) {
           COSMIC ARCHIVES
         </span>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-black font-heading text-white tracking-tight uppercase leading-none">
-          The Cosmic Chronicle
+          The {siteName || "Cosmic"} Chronicle
         </h1>
         <p className="text-sm sm:text-base text-neutral-400 max-w-[620px] font-light leading-relaxed">
-          Discover stories and papers about cosmology, astrophysics, the early universe, stellar accretion, and observations of the cosmic background.
+          {siteDescription || "Discover stories and papers about cosmology, astrophysics, the early universe, stellar accretion, and observations of the cosmic background."}
         </p>
 
         {/* Search Input bar */}

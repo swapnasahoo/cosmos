@@ -9,7 +9,8 @@ import {
   updatePost, 
   deletePost, 
   BlogPost, 
-  User 
+  User,
+  updateSystemSettings
 } from "@/lib/db";
 
 // Helper to generate a slug from a title
@@ -207,7 +208,25 @@ export async function saveUserAction(prevState: any, formData: FormData) {
 
     if (id) {
       // Edit User
-      // 1. Update public.profiles details
+      // 1. Update auth.users email and metadata
+      const email = `${username}@cosmos.local`;
+      const updateData: any = {
+        email,
+        email_confirm: true,
+        user_metadata: { name, role, username }
+      };
+
+      if (password && password.trim() !== "") {
+        if (password.length < 6) return { error: "Password must be at least 6 characters." };
+        updateData.password = password;
+      }
+
+      const { error: authError } = await adminSupabase.auth.admin.updateUserById(id, updateData);
+      if (authError) {
+        return { error: authError.message };
+      }
+
+      // 2. Update public.profiles details
       const { error: profileError } = await adminSupabase
         .from("profiles")
         .update({ name, role, username })
@@ -215,17 +234,6 @@ export async function saveUserAction(prevState: any, formData: FormData) {
 
       if (profileError) {
         return { error: profileError.message };
-      }
-
-      // 2. If password was set, update it in auth
-      if (password && password.trim() !== "") {
-        if (password.length < 6) return { error: "Password must be at least 6 characters." };
-        const { error: authError } = await adminSupabase.auth.admin.updateUserById(id, {
-          password: password,
-        });
-        if (authError) {
-          return { error: authError.message };
-        }
       }
 
       return { success: true, message: "User updated successfully!" };
@@ -279,5 +287,54 @@ export async function deleteUserAction(id: string) {
   } catch (err: any) {
     console.error("Delete user action error:", err);
     return { error: err.message || "Failed to delete user." };
+  }
+}
+
+// 4. Quick Post Actions
+export async function togglePostStatusAction(id: string) {
+  const session = await getSession();
+  if (!session || session.role !== "admin") {
+    return { error: "Unauthorized. Admin privileges required." };
+  }
+
+  try {
+    const post = await getPostById(id);
+    if (!post) return { error: "Post not found." };
+
+    const updatedPost = {
+      ...post,
+      published: !post.published,
+      updatedAt: new Date().toISOString()
+    };
+
+    await updatePost(updatedPost);
+    revalidatePath("/blog");
+    revalidatePath(`/blog/${post.slug}`);
+    return { success: true, published: updatedPost.published };
+  } catch (err: any) {
+    console.error("Toggle post status error:", err);
+    return { error: err.message || "Failed to toggle status." };
+  }
+}
+
+// 5. System Settings Actions
+export async function saveSettingsAction(prevState: any, formData: FormData) {
+  const session = await getSession();
+  if (!session || session.role !== "admin") {
+    return { error: "Unauthorized. Admin privileges required." };
+  }
+
+  const siteName = formData.get("siteName")?.toString().trim() || "COSMOS";
+  const siteDescription = formData.get("siteDescription")?.toString().trim() || "";
+  const allowSignups = formData.get("allowSignups") === "true";
+
+  try {
+    await updateSystemSettings({ siteName, siteDescription, allowSignups });
+    revalidatePath("/");
+    revalidatePath("/blog");
+    return { success: true, message: "Settings updated successfully!" };
+  } catch (err: any) {
+    console.error("Save settings action error:", err);
+    return { error: err.message || "Failed to save settings." };
   }
 }

@@ -54,10 +54,11 @@ export default function Simulator() {
   const [hudState, setHudState] = useState("Idle");
   const [hudDensity, setHudDensity] = useState("0%");
   
-  // Audio state hooks (stubs for this branch)
+  // Audio state hooks
   const [isSoundEnabled, setIsSoundEnabled] = useState(false);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const [selectedVoice, setSelectedVoice] = useState("auto");
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   // DOM Refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -74,6 +75,13 @@ export default function Simulator() {
   const moonAngleRef = useRef(0);
   const earthRotationRef = useRef(0);
 
+  // Audio nodes Refs
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const synthVolumeRef = useRef<GainNode | null>(null);
+  const ambientOsc1Ref = useRef<OscillatorNode | null>(null);
+  const ambientOsc2Ref = useRef<OscillatorNode | null>(null);
+  const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
   // Preload Earth Map
   useEffect(() => {
     const img = new Image();
@@ -81,16 +89,220 @@ export default function Simulator() {
     worldMapImgRef.current = img;
   }, []);
 
-  // Audio system stubs (to be populated in audio-system branch)
-  const initAudio = () => {};
-  const playBoom = () => {};
-  const playAmbient = () => {};
-  const playSwoosh = () => {};
-  const playPing = () => {};
-  const speakExplanation = (text: string) => {
-    console.log("TTS narration stub:", text);
+  // Populate Speech Synthesis Voices
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.speechSynthesis === "undefined") return;
+
+    const populateVoices = () => {
+      const voicesList = window.speechSynthesis.getVoices();
+      setAvailableVoices(voicesList);
+    };
+
+    populateVoices();
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = populateVoices;
+    }
+  }, []);
+
+  // Audio system implementations
+  const initAudio = () => {
+    if (audioCtxRef.current) return;
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioContextClass();
+      audioCtxRef.current = ctx;
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0, ctx.currentTime);
+      gain.connect(ctx.destination);
+      synthVolumeRef.current = gain;
+
+      // Start background hum
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+
+      osc1.type = "sawtooth";
+      osc2.type = "sine";
+
+      osc1.frequency.setValueAtTime(55, ctx.currentTime);
+      osc2.frequency.setValueAtTime(55.3, ctx.currentTime);
+
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.setValueAtTime(90, ctx.currentTime);
+
+      osc1.connect(lowpass);
+      osc2.connect(lowpass);
+      lowpass.connect(gain);
+
+      osc1.start();
+      osc2.start();
+
+      ambientOsc1Ref.current = osc1;
+      ambientOsc2Ref.current = osc2;
+    } catch (err) {
+      console.warn("Failed to initialize Web Audio API:", err);
+    }
   };
-  const stopSpeech = () => {};
+
+  const playBoom = () => {
+    const ctx = audioCtxRef.current;
+    if (!ctx || !isSoundEnabled) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(120, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(15, ctx.currentTime + 2.0);
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(140, ctx.currentTime);
+    lp.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 1.8);
+
+    gain.gain.setValueAtTime(0.35, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2.2);
+
+    osc.connect(lp);
+    lp.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 2.3);
+  };
+
+  const playPing = () => {
+    const ctx = audioCtxRef.current;
+    if (!ctx || !isSoundEnabled) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.08);
+
+    gain.gain.setValueAtTime(0.06, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.12);
+  };
+
+  const playSwoosh = () => {
+    const ctx = audioCtxRef.current;
+    if (!ctx || !isSoundEnabled) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(200, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(450, ctx.currentTime + 0.4);
+
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.55);
+  };
+
+  const playAmbient = () => {
+    const ctx = audioCtxRef.current;
+    const volume = synthVolumeRef.current;
+    if (!ctx || !volume) return;
+    if (isSoundEnabled) {
+      volume.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 0.5);
+    } else {
+      volume.gain.linearRampToValueAtTime(0.0, ctx.currentTime + 0.5);
+    }
+  };
+
+  const speakExplanation = (text: string) => {
+    if (!isVoiceEnabled || typeof window === "undefined" || typeof window.speechSynthesis === "undefined") return;
+    stopSpeech();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    currentUtteranceRef.current = utterance;
+
+    const voices = window.speechSynthesis.getVoices();
+    let voiceToUse = null;
+
+    if (selectedVoice !== "auto") {
+      voiceToUse = voices.find((v) => v.name === selectedVoice) || null;
+    }
+
+    if (!voiceToUse) {
+      // Find the best Indian voice
+      voiceToUse = voices.find(isIndianVoice) || null;
+    }
+
+    if (!voiceToUse) {
+      // Fallback 1: Google US English
+      voiceToUse = voices.find((v) => v.name.includes("Google US English") || v.name.includes("Natural") || v.lang === "en-US") || null;
+    }
+
+    if (!voiceToUse && voices.length > 0) {
+      // Fallback 2: Any English voice
+      voiceToUse = voices.find((v) => v.lang.startsWith("en")) || null;
+    }
+
+    if (voiceToUse) {
+      utterance.voice = voiceToUse;
+      console.log(`Speech Synthesis using Voice: ${voiceToUse.name} (${voiceToUse.lang})`);
+    }
+
+    utterance.rate = 0.88;
+    utterance.pitch = 1.0;
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeech = () => {
+    if (typeof window !== "undefined" && typeof window.speechSynthesis !== "undefined") {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
+    }
+  };
+
+  // Helper matching Indian English accents
+  const isIndianVoice = (v: SpeechSynthesisVoice) =>
+    v.lang === "en-IN" ||
+    v.lang === "en_IN" ||
+    v.name.toLowerCase().includes("india") ||
+    v.name.toLowerCase().includes("indian") ||
+    v.name.toLowerCase().includes("heera") ||
+    v.name.toLowerCase().includes("veena") ||
+    v.name.toLowerCase().includes("rishi") ||
+    v.name.toLowerCase().includes("priya") ||
+    v.name.toLowerCase().includes("neerja") ||
+    v.name.toLowerCase().includes("ravi");
+
+  // React audio hooks bindings
+  useEffect(() => {
+    playAmbient();
+  }, [isSoundEnabled]);
+
+  useEffect(() => {
+    if (!isVoiceEnabled) {
+      stopSpeech();
+    }
+  }, [isVoiceEnabled]);
+
+  useEffect(() => {
+    return () => {
+      stopSpeech();
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close();
+      }
+    };
+  }, []);
 
   // Resize canvas handler
   const resizeCanvas = () => {
@@ -823,9 +1035,27 @@ export default function Simulator() {
               <select
                 value={selectedVoice}
                 onChange={(e) => setSelectedVoice(e.target.value)}
-                className="voice-select bg-black/60 border border-white/10 text-neutral-400 hover:text-white rounded-lg text-xs font-heading font-semibold py-1 px-2.5 backdrop-blur-md focus:outline-none"
+                className="voice-select bg-black/60 border border-white/10 text-neutral-400 hover:text-white rounded-lg text-xs font-heading font-semibold py-1 px-2.5 backdrop-blur-md focus:outline-none cursor-pointer"
               >
                 <option value="auto">Accent: Indian (Auto) 🇮🇳</option>
+                {(() => {
+                  const englishVoices = availableVoices.filter((v) => v.lang.startsWith("en") || isIndianVoice(v));
+                  const sortedVoices = [...englishVoices].sort((a, b) => {
+                    const aInd = isIndianVoice(a);
+                    const bInd = isIndianVoice(b);
+                    if (aInd && !bInd) return -1;
+                    if (!aInd && bInd) return 1;
+                    return a.name.localeCompare(b.name);
+                  });
+                  return sortedVoices.map((voice) => {
+                    const isInd = isIndianVoice(voice);
+                    return (
+                      <option key={voice.name} value={voice.name} className="bg-[#0b071e] text-white">
+                        {voice.name.replace(/Microsoft |Google |Apple /g, "")} ({voice.lang}){isInd ? " 🇮🇳" : ""}
+                      </option>
+                    );
+                  });
+                })()}
               </select>
             </div>
 
